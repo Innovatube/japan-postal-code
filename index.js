@@ -56,7 +56,10 @@ exports.get = function (zip_code, callback) {
     // 郵便番号を数字のみ7桁取り出す
     //    var zipoptimize = function(AjaxZip3.fzip1, AjaxZip3.fzip2){
   var vzip = zip_code;
-  if (!vzip) return;
+  if (!vzip) {
+    callback(-1);
+    return;
+  }
 
   // extract number only
   var nzip = '';
@@ -66,7 +69,10 @@ exports.get = function (zip_code, callback) {
     if ( chr > 57 ) continue;
     nzip += vzip.charAt(i);
   }
-  if (nzip.length < 7 ) return;
+  if (nzip.length < 7 ) {
+    callback(-1);
+    return;
+  }
 
   // fetch from cache data using upper 3 digit
   var zip3 = nzip.substr(0,3);
@@ -82,11 +88,20 @@ var parse = function(nzip, data, callback){
   // Opera バグ対策：0x00800000 を超える添字は +0xff000000 されてしまう
   var opera = (nzip-0+0xff000000)+"";
   if ( ! array && data[opera] ) array = data[opera];
-  if ( ! array ) return;
+  if ( ! array ) {
+    callback(-1);
+    return;
+  }
   var pref_id = array[0];                 // 都道府県ID
-  if ( ! pref_id ) return;
+  if ( ! pref_id ) {
+    callback(-1);
+    return;
+  }
   var jpref = PREFMAP[pref_id];  // 都道府県名
-  if ( ! jpref ) return;
+  if ( ! jpref ) {
+    callback(-1);
+    return;
+  }
   var jcity = array[1];
   if ( ! jcity ) jcity = '';              // 市区町村名
   var jarea = array[2];
@@ -104,10 +119,20 @@ var parse = function(nzip, data, callback){
 fetchRemote = function (nzip, callback) {
   var zip3 = nzip.substr(0,3);
   var url = JSONDATA+'/'+zip3+'.js';
-  jsonp(url, { name: '$yubin'}, function(error, data) {
-    if (!error) {
-      CACHE[zip3] = data;
-      parse(nzip, data, callback);
-    }
-  });
+  
+  fetch(url)
+    .then(function (data) {
+      if (data.status != 200) throw new Error('-1')
+      jsonp(url, { name: '$yubin'}, function(error, data) {
+        if (!error) {
+          CACHE[zip3] = data;
+          parse(nzip, data, callback);
+        } else {
+          callback(-1);
+        }
+      });
+    })
+    .catch(function (error) {
+      callback(-1);
+    });
 };
